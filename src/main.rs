@@ -1,7 +1,7 @@
 // Uncomment this block to pass the first stage
 use anyhow::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -12,10 +12,17 @@ async fn main() -> Result<()> {
     println!("Listening at 6379...");
 
     loop {
-        let (mut stream, origin) = listener.accept().await?;
+        let (stream, origin) = listener.accept().await?;
         println!("Client connected from: {origin}");
+        handle_connection(stream).await?;
+    }
+}
 
-        let mut buffer = [0u8; 1024];
+async fn handle_connection(stream: TcpStream) -> Result<()> {
+    let mut stream = stream;
+    let mut buffer = [0u8; 1024];
+
+    loop {
         let read_size = stream.read(&mut buffer).await?;
         if read_size == 0 {
             println!("Empty message, shutting down");
