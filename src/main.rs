@@ -1,8 +1,6 @@
 // Uncomment this block to pass the first stage
 use anyhow::*;
-use tokio::{io::AsyncWriteExt, net::TcpListener};
-use tokio_stream::StreamExt;
-use tokio_util::codec::{BytesCodec, Framed};
+use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -12,15 +10,22 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:6379").await?;
     println!("Listening at 6379...");
 
-    loop {
-        let (stream, origin) = listener.accept().await?;
-        println!("Client connected from: {origin}");
+    let (_stream, origin) = listener.accept().await?;
+    println!("Firs stream... {origin}");
 
-        let mut framed = Framed::new(stream, BytesCodec::new());
-        if let Some(message) = framed.next().await {
-            let message = message?;
-            println!("Received message: {}", String::from_utf8_lossy(&message));
-            framed.into_inner().write_all(b"+PONG\r\n").await?;
-        };
-    }
+    Ok(())
+    // Uncomment this block to pass the first stage
+    //
+    // let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
+    //
+    // for stream in listener.incoming() {
+    //     match stream {
+    //         Ok(_stream) => {
+    //             println!("accepted new connection");
+    //         }
+    //         Err(e) => {
+    //             println!("error: {}", e);
+    //         }
+    //     }
+    // }
 }
