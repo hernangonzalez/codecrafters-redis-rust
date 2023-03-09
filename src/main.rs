@@ -1,7 +1,8 @@
 // Uncomment this block to pass the first stage
 use anyhow::*;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::{io::AsyncWriteExt, net::TcpListener};
+use tokio_stream::StreamExt;
+use tokio_util::codec::{BytesCodec, Framed};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -12,22 +13,14 @@ async fn main() -> Result<()> {
     println!("Listening at 6379...");
 
     loop {
-        let (mut stream, origin) = listener.accept().await?;
+        let (stream, origin) = listener.accept().await?;
         println!("Client connected from: {origin}");
 
-        let mut buffer = [0u8; 1024];
-        let read_size = stream.read(&mut buffer).await?;
-        if read_size == 0 {
-            println!("Empty message, shutting down");
-            stream.shutdown().await?
-        }
-
-        println!("Received message: {}", String::from_utf8_lossy(&buffer));
-        let response = match &buffer[..] {
-            b"PING" => "+PONG\r\n",
-            _ => "-Ooopss\r\n",
+        let mut framed = Framed::new(stream, BytesCodec::new());
+        if let Some(message) = framed.next().await {
+            let message = message?;
+            println!("Received message: {}", String::from_utf8_lossy(&message));
+            framed.into_inner().write_all(b"+PONG\r\n").await?;
         };
-
-        stream.write_all(response.as_bytes()).await?;
     }
 }
