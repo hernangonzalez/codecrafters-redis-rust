@@ -1,5 +1,5 @@
 // Uncomment this block to pass the first stage
-use anyhow::*;
+use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -14,7 +14,13 @@ async fn main() -> Result<()> {
     loop {
         let (stream, origin) = listener.accept().await?;
         println!("Client connected from: {origin}");
-        handle_connection(stream).await?;
+        tokio::spawn(async move {
+            let result = handle_connection(stream).await;
+            match result {
+                Ok(_) => println!("Served connection from: {origin}"),
+                Err(e) => println!("Failed serving {origin} with error: {e}"),
+            };
+        });
     }
 }
 
@@ -26,7 +32,8 @@ async fn handle_connection(stream: TcpStream) -> Result<()> {
         let read_size = stream.read(&mut buffer).await?;
         if read_size == 0 {
             println!("Empty message, shutting down");
-            stream.shutdown().await?
+            stream.shutdown().await?;
+            return Ok(());
         }
 
         println!("Received message: {}", String::from_utf8_lossy(&buffer));
