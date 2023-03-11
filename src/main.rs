@@ -5,6 +5,7 @@ use anyhow::Result;
 use bytes::BytesMut;
 use command::Command;
 use response::{Builder, Response};
+use std::collections::VecDeque;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -44,11 +45,13 @@ async fn handle_connection(stream: TcpStream) -> Result<()> {
         let frame = std::str::from_utf8(&buffer)?;
         println!("Received message: {frame}");
 
-        let mut lines = frame.lines();
-        let command = Command::try_from(&mut lines);
-        let response = handle_command(command);
+        let mut lines: VecDeque<_> = frame.lines().map(String::from).collect();
 
-        stream.write_all(response.as_bytes()).await?;
+        while !lines.is_empty() {
+            let command = command::extract(&mut lines);
+            let response = handle_command(command);
+            stream.write_all(response.as_bytes()).await?;
+        }
     }
 }
 
