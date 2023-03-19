@@ -42,7 +42,7 @@ fn scan_command(lines: Lines) -> Result<Command> {
             let text = args.join(" ");
             Command::Echo(text)
         }
-        _ => Command::Unknown(command),
+        _ => Command::Unknown(command, args.join(" ")),
     };
 
     Ok(command)

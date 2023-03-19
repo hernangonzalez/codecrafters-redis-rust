@@ -2,5 +2,5 @@
 pub enum Command {
     Ping,
     Echo(String),
-    Unknown(String),
+    Unknown(String, String),
 }

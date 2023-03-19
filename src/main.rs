@@ -75,6 +75,9 @@ fn into_response(cmd: &Command) -> Option<Response> {
     match cmd {
         Command::Ping => Some(Response::pong()),
         Command::Echo(message) => Some(Response::text(message)),
-        Command::Unknown(_) => None,
+        Command::Unknown(cmd, args) => {
+            println!("Skip unknown command: {cmd}, args: {args}");
+            None
+        }
     }
 }
