@@ -2,16 +2,18 @@ mod cache;
 
 use crate::command::Command;
 use crate::response::{Builder, Response};
-use cache::Cache;
+use std::sync::Mutex;
+
+type Cache = cache::Cache<String, String>;
 
 pub struct Redis {
-    cache: Cache<String, String>,
+    cache: Mutex<Cache>,
 }
 
 impl Redis {
     pub fn new() -> Self {
         Self {
-            cache: Cache::new(),
+            cache: Mutex::new(Cache::new()),
         }
     }
 
@@ -28,11 +30,15 @@ impl Redis {
         }
     }
 
-    fn handle_get(&self, _k: &str) -> Response {
-        Response::error("Not found")
+    fn handle_get(&self, k: &String) -> Response {
+        let Ok(mut cache) = self.cache.lock() else { return  Response::error("Cannot access cache"); };
+        let Some(value) = cache.get(k) else { return Response::error("Key not found") };
+        Response::text(value)
     }
 
-    fn handle_set(&self, _k: &str, _v: &str) -> Response {
+    fn handle_set(&self, key: &str, value: &str) -> Response {
+        let Ok(mut cache) = self.cache.lock() else { return  Response::error("Cannot access cache"); };
+        cache.put(key.to_string(), value.to_string());
         Response::text("Ok")
     }
 }
