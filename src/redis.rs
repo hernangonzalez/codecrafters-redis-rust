@@ -31,13 +31,16 @@ impl Redis {
     }
 
     fn handle_get(&self, k: &String) -> Response {
-        let Ok(mut cache) = self.cache.lock() else { return  Response::error("Cannot access cache"); };
-        let Some(value) = cache.get(k) else { return Response::error("Key not found") };
-        Response::text(value)
+        let mut cache = self.cache.lock().unwrap();
+        if let Some(value) = cache.get(k) {
+            Response::text(value)
+        } else {
+            Response::error("Key not found")
+        }
     }
 
     fn handle_set(&self, key: &str, value: &str) -> Response {
-        let Ok(mut cache) = self.cache.lock() else { return  Response::error("Cannot access cache"); };
+        let mut cache = self.cache.lock().unwrap();
         cache.put(key.to_string(), value.to_string());
         Response::text("Ok")
     }
