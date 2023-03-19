@@ -31,18 +31,27 @@ fn scan_command(lines: Lines) -> Result<Command> {
     assert!(line_head.starts_with('$'));
 
     let command = lines.next().context("command")?.to_uppercase();
-    let args: Vec<_> = lines
-        .filter(|s| !s.starts_with('$'))
-        .map(|s| s.to_string())
-        .collect();
+    let mut args = lines.filter(|s| !s.starts_with('$'));
 
     let command = match command.as_str() {
         "PING" => Command::Ping,
-        "ECHO" => {
-            let text = args.join(" ");
-            Command::Echo(text)
+        "GET" => {
+            let key = args.next().context("get key")?;
+            Command::Get(key.to_string())
         }
-        _ => Command::Unknown(command, args.join(" ")),
+        "SET" => {
+            let key = args.next().context("set key")?.to_string();
+            let value = args.next().context("set value")?.to_string();
+            Command::Set(key, value)
+        }
+        "ECHO" => {
+            let all: Vec<_> = args.collect();
+            Command::Echo(all.join(""))
+        }
+        _ => {
+            let all: Vec<_> = args.collect();
+            Command::Unknown(command, all.join(" "))
+        }
     };
 
     Ok(command)
