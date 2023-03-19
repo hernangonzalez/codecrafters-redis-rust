@@ -39,9 +39,19 @@ impl Redis {
         }
     }
 
-    fn handle_set(&self, key: &str, value: &str) -> Response {
+    fn handle_set(&self, key: &String, value: &str) -> Response {
+        let previous = {
+            let mut cache = self.cache.lock().unwrap();
+            cache.get(key).cloned()
+        };
+
         let mut cache = self.cache.lock().unwrap();
         cache.put(key.to_string(), value.to_string());
-        Response::ok()
+
+        if let Some(value) = previous {
+            Response::text(&value)
+        } else {
+            Response::ok()
+        }
     }
 }
