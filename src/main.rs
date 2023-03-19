@@ -1,11 +1,11 @@
 mod command;
 mod response;
+mod scanner;
 
 use anyhow::Result;
 use bytes::BytesMut;
 use command::Command;
 use response::{Builder, Response};
-use std::collections::VecDeque;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -43,22 +43,38 @@ async fn handle_connection(stream: TcpStream) -> Result<()> {
         }
 
         let frame = std::str::from_utf8(&buffer)?;
-        println!("Received message: {frame}");
+        let commands = scanner::scan(frame);
+        println!("Received #{} commands", commands.len());
 
-        let mut lines: VecDeque<_> = frame.lines().map(String::from).collect();
+        let responses = commands
+            .iter()
+            .filter_map(into_response)
+            .collect::<Vec<_>>();
 
-        while !lines.is_empty() {
-            let command = command::extract(&mut lines);
-            let response = handle_command(command);
-            stream.write_all(response.as_bytes()).await?;
+        if responses.is_empty() {
+            flush(&mut stream, &Response::error("No supported command found")).await?;
+        } else {
+            flush_all(&mut stream, &responses).await?;
         }
     }
 }
 
-fn handle_command(c: Result<Command, String>) -> Response {
-    match c {
-        Ok(Command::Ping) => Response::pong(),
-        Ok(Command::Echo(message)) => Response::text(&message),
-        Err(e) => Response::error(&e),
+async fn flush(stream: &mut TcpStream, response: &Response) -> Result<()> {
+    stream.write_all(response.as_bytes()).await?;
+    Ok(())
+}
+
+async fn flush_all(stream: &mut TcpStream, all: &[Response]) -> Result<()> {
+    for response in all {
+        flush(stream, response).await?;
+    }
+    Ok(())
+}
+
+fn into_response(cmd: &Command) -> Option<Response> {
+    match cmd {
+        Command::Ping => Some(Response::pong()),
+        Command::Echo(message) => Some(Response::text(message)),
+        Command::Unknown(_) => None,
     }
 }
