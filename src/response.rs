@@ -6,6 +6,7 @@ pub trait Builder {
     fn pong() -> Self;
     fn text(inner: &str) -> Self;
     fn error(msg: &str) -> Self;
+    fn ok() -> Self;
 }
 
 const CRLF: &str = "\r\n";
@@ -21,6 +22,10 @@ impl Builder for Response {
 
     fn error(msg: &str) -> Self {
         Response(format!("-Error {msg}{CRLF}"))
+    }
+
+    fn ok() -> Self {
+        Self::text("OK")
     }
 }
 

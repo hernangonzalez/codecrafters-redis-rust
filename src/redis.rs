@@ -42,6 +42,6 @@ impl Redis {
     fn handle_set(&self, key: &str, value: &str) -> Response {
         let mut cache = self.cache.lock().unwrap();
         cache.put(key.to_string(), value.to_string());
-        Response::text("Ok")
+        Response::ok()
     }
 }
