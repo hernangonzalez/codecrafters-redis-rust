@@ -1,10 +1,19 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time;
+use thiserror::Error;
 
 struct Item<Value> {
     value: Value,
     expires_at: Option<time::Instant>,
+}
+
+#[derive(Error, PartialEq, Debug)]
+pub enum CacheError {
+    #[error("Key not found")]
+    Missing,
+    #[error("Key has expired")]
+    Expired,
 }
 
 pub struct Cache<K: Sized, V> {
@@ -21,9 +30,15 @@ where
         }
     }
 
-    pub fn get(&mut self, k: &K) -> Option<&V> {
-        self.del_if_expired(k);
-        self.items.get(k).map(|i| &i.value)
+    fn fetch(&self, k: &K) -> Option<&Item<V>> {
+        self.items.get(k)
+    }
+
+    pub fn value(&mut self, k: &K) -> Result<&V, CacheError> {
+        if self.del_if_expired(k) {
+            return Err(CacheError::Expired);
+        }
+        self.fetch(k).map(|i| &i.value).ok_or(CacheError::Missing)
     }
 
     pub fn put(&mut self, k: K, v: V, t: Option<time::Instant>) {
@@ -38,13 +53,20 @@ where
         self.items.remove(k);
     }
 
-    fn del_if_expired(&mut self, k: &K) {
-        let timeout = self.items.get(k).and_then(|i| i.expires_at);
-        if let Some(timeout) = timeout {
-            if timeout < time::Instant::now() {
-                self.del(k);
-            }
+    fn del_if_expired(&mut self, k: &K) -> bool {
+        let is_expired = self.items.get(k).map(|i| i.is_expired()).unwrap_or(false);
+        if is_expired {
+            self.del(k);
         }
+        is_expired
+    }
+}
+
+impl<T> Item<T> {
+    fn is_expired(&self) -> bool {
+        self.expires_at
+            .map(|t| t < time::Instant::now())
+            .unwrap_or(false)
     }
 }
 
@@ -53,18 +75,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get() {
+    fn test_value() {
         let mut cache = Cache::new();
         cache.put("key", 42, None);
-        assert_eq!(cache.get(&"key"), Some(&42));
+        assert_eq!(cache.value(&"key"), Ok(&42));
     }
 
     #[test]
-    fn test_del() {
+    fn test_value_miss() {
         let mut cache = Cache::new();
-        cache.put("key", 42, None);
-        assert_eq!(cache.get(&"key"), Some(&42));
-        cache.del(&"key");
-        assert_eq!(cache.get(&"key"), None);
+        cache.put("key", 42, Some(time::Instant::now()));
+        assert_eq!(cache.value(&"key"), Err(CacheError::Missing));
     }
 }

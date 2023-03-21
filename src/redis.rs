@@ -33,24 +33,26 @@ impl Redis {
 
     fn handle_get(&self, k: &String) -> Response {
         let mut cache = self.cache.lock().expect("unique access to cache");
-        if let Some(value) = cache.get(k) {
-            Response::text(value)
-        } else {
-            Response::error("Key not found")
+        match cache.value(k) {
+            Ok(value) => Response::text(value),
+            e => {
+                println!("Cache value error: {e:?}");
+                Response::null()
+            }
         }
     }
 
     fn handle_set(&self, key: &String, value: &str, duration: &Option<time::Duration>) -> Response {
         let previous = {
             let mut cache = self.cache.lock().unwrap();
-            cache.get(key).cloned()
+            cache.value(key).cloned()
         };
         let timeout = duration.map(|d| time::Instant::now() + d);
         let mut cache = self.cache.lock().expect("unique access to cache");
 
         cache.put(key.to_string(), value.to_string(), timeout);
 
-        if let Some(value) = previous {
+        if let Ok(value) = previous {
             Response::text(&value)
         } else {
             Response::ok()
