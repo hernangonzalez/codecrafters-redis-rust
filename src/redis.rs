@@ -3,6 +3,7 @@ mod cache;
 use crate::command::Command;
 use crate::response::{Builder, Response};
 use std::sync::Mutex;
+use std::time;
 
 type Cache = cache::Cache<String, String>;
 
@@ -22,7 +23,7 @@ impl Redis {
             Command::Ping => Some(Response::pong()),
             Command::Echo(message) => Some(Response::text(message)),
             Command::Get(key) => Some(self.handle_get(key)),
-            Command::Set(key, value) => Some(self.handle_set(key, value)),
+            Command::Set(key, value, delta) => Some(self.handle_set(key, value, delta)),
             Command::Unknown(cmd, args) => {
                 println!("Skip unknown command: {cmd}, args: {args}");
                 None
@@ -31,7 +32,7 @@ impl Redis {
     }
 
     fn handle_get(&self, k: &String) -> Response {
-        let mut cache = self.cache.lock().unwrap();
+        let mut cache = self.cache.lock().expect("unique access to cache");
         if let Some(value) = cache.get(k) {
             Response::text(value)
         } else {
@@ -39,14 +40,15 @@ impl Redis {
         }
     }
 
-    fn handle_set(&self, key: &String, value: &str) -> Response {
+    fn handle_set(&self, key: &String, value: &str, duration: &Option<time::Duration>) -> Response {
         let previous = {
             let mut cache = self.cache.lock().unwrap();
             cache.get(key).cloned()
         };
+        let timeout = duration.map(|d| time::Instant::now() + d);
+        let mut cache = self.cache.lock().expect("unique access to cache");
 
-        let mut cache = self.cache.lock().unwrap();
-        cache.put(key.to_string(), value.to_string());
+        cache.put(key.to_string(), value.to_string(), timeout);
 
         if let Some(value) = previous {
             Response::text(&value)

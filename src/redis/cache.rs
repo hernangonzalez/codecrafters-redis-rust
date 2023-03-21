@@ -3,17 +3,8 @@ use std::hash::Hash;
 use std::time;
 
 struct Item<Value> {
-    _expires_at: time::Instant,
     value: Value,
-}
-
-impl<T> Item<T> {
-    fn new(value: T) -> Self {
-        Self {
-            _expires_at: time::Instant::now(),
-            value,
-        }
-    }
+    expires_at: Option<time::Instant>,
 }
 
 pub struct Cache<K: Sized, V> {
@@ -31,16 +22,29 @@ where
     }
 
     pub fn get(&mut self, k: &K) -> Option<&V> {
+        self.del_if_expired(k);
         self.items.get(k).map(|i| &i.value)
     }
 
-    pub fn put(&mut self, k: K, v: V) {
-        let item = Item::new(v);
+    pub fn put(&mut self, k: K, v: V, t: Option<time::Instant>) {
+        let item = Item {
+            value: v,
+            expires_at: t,
+        };
         self.items.insert(k, item);
     }
 
-    pub fn del(&mut self, k: &K) {
+    fn del(&mut self, k: &K) {
         self.items.remove(k);
+    }
+
+    fn del_if_expired(&mut self, k: &K) {
+        let timeout = self.items.get(k).and_then(|i| i.expires_at);
+        if let Some(timeout) = timeout {
+            if timeout < time::Instant::now() {
+                self.del(k);
+            }
+        }
     }
 }
 
@@ -51,14 +55,14 @@ mod tests {
     #[test]
     fn test_get() {
         let mut cache = Cache::new();
-        cache.put("key", 42);
+        cache.put("key", 42, None);
         assert_eq!(cache.get(&"key"), Some(&42));
     }
 
     #[test]
     fn test_del() {
         let mut cache = Cache::new();
-        cache.put("key", 42);
+        cache.put("key", 42, None);
         assert_eq!(cache.get(&"key"), Some(&42));
         cache.del(&"key");
         assert_eq!(cache.get(&"key"), None);
