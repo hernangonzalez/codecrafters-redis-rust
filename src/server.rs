@@ -20,10 +20,10 @@ impl Server {
 
     pub async fn handle_connection(&self, stream: TcpStream) -> Result<()> {
         let mut stream = stream;
-        let mut buffer = BytesMut::with_capacity(1024);
         let now = time::Instant::now();
 
         loop {
+            let mut buffer = BytesMut::with_capacity(1024);
             let read_size = stream.read_buf(&mut buffer).await?;
             if read_size == 0 {
                 println!("Empty message, shutting down connection.");
