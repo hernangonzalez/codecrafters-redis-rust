@@ -44,7 +44,7 @@ fn scan_command(lines: Lines) -> Result<Command> {
             let key = args.next().context("set key")?.to_string();
             let value = args.next().context("set value")?.to_string();
             let mut timeout = None;
-            if args.next() == Some("PX") {
+            if args.next().map(|s| s.to_uppercase()) == Some("PX".to_string()) {
                 let param = args.next().context("PX miliseconds")?.parse::<u64>()?;
                 timeout = Some(time::Duration::from_millis(param));
             }
