@@ -33,7 +33,7 @@ impl Server {
 
             let frame = std::str::from_utf8(&buffer)?;
             let commands = scanner::scan(frame);
-            println!("Received #{} commands", commands.len());
+            println!("Received #{} commands - at {now:?}", commands.len());
 
             let responses = commands
                 .iter()

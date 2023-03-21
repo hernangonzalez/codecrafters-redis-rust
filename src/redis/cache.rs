@@ -73,6 +73,7 @@ impl<T> Item<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
 
     #[test]
     fn test_value() {
@@ -84,7 +85,9 @@ mod tests {
     #[test]
     fn test_value_miss() {
         let mut cache = Cache::new();
-        cache.put("key", 42, Some(time::Instant::now()));
-        assert_eq!(cache.value(&"key"), Err(CacheError::Missing));
+        let dur = time::Duration::from_millis(100);
+        cache.put("key", 42, Some(time::Instant::now() + dur));
+        thread::sleep(dur);
+        assert_eq!(cache.value(&"key"), Err(CacheError::Expired));
     }
 }

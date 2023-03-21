@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+#[derive(PartialEq, Debug)]
 pub struct Response(String);
 
 pub trait Builder {

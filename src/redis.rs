@@ -46,6 +46,7 @@ impl Redis {
     }
 
     fn handle_set(&self, key: &String, value: &str, timeout: Option<time::Instant>) -> Response {
+        dbg!(key, value, timeout);
         let previous = {
             let mut cache = self.cache.lock().unwrap();
             cache.value(key).cloned()
@@ -59,5 +60,27 @@ impl Redis {
         } else {
             Response::ok()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        thread,
+        time::{Duration, Instant},
+    };
+
+    #[test]
+    fn test_set_get() {
+        let dur = Duration::from_millis(100);
+        let set = Command::Set("k".into(), "v".into(), Some(dur));
+        let get = Command::Get("k".into());
+        let sut = Redis::new();
+        let now = Instant::now();
+        assert_eq!(sut.handle(&set, now), Some(Response::ok()));
+        assert_eq!(sut.handle(&get, now), Some(Response::text("v")));
+        thread::sleep(dur);
+        assert_eq!(sut.handle(&get, Instant::now()), Some(Response::null()));
     }
 }
