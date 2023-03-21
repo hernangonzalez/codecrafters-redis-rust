@@ -65,7 +65,7 @@ where
 impl<T> Item<T> {
     fn is_expired(&self) -> bool {
         self.expires_at
-            .map(|t| t < time::Instant::now())
+            .map(|t| t <= time::Instant::now())
             .unwrap_or(false)
     }
 }
