@@ -20,7 +20,6 @@ impl Server {
 
     pub async fn handle_connection(&self, stream: TcpStream) -> Result<()> {
         let mut stream = stream;
-        let now = time::Instant::now();
 
         loop {
             let mut buffer = BytesMut::with_capacity(1024);
@@ -30,12 +29,9 @@ impl Server {
                 stream.shutdown().await?;
                 return Ok(());
             }
-
+            let now = time::Instant::now();
             let frame = std::str::from_utf8(&buffer)?;
-            dbg!(frame);
             let commands = scanner::scan(frame);
-            let commands = dbg!(commands);
-            println!("Received #{} commands - at {now:?}", commands.len());
 
             let responses = commands
                 .iter()

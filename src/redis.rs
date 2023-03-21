@@ -46,7 +46,6 @@ impl Redis {
     }
 
     fn handle_set(&self, key: &String, value: &str, timeout: Option<time::Instant>) -> Response {
-        dbg!(key, value, timeout);
         let previous = {
             let mut cache = self.cache.lock().unwrap();
             cache.value(key).cloned()
