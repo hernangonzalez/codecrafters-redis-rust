@@ -34,9 +34,13 @@ where
         self.items.get(k).map(|i| &i.value)
     }
 
-    pub fn put(&mut self, key: K, value: V) {
-        let item = Item::new(value);
-        self.items.insert(key, item);
+    pub fn put(&mut self, k: K, v: V) {
+        let item = Item::new(v);
+        self.items.insert(k, item);
+    }
+
+    pub fn del(&mut self, k: &K) {
+        self.items.remove(k);
     }
 }
 
@@ -49,5 +53,14 @@ mod tests {
         let mut cache = Cache::new();
         cache.put("key", 42);
         assert_eq!(cache.get(&"key"), Some(&42));
+    }
+
+    #[test]
+    fn test_del() {
+        let mut cache = Cache::new();
+        cache.put("key", 42);
+        assert_eq!(cache.get(&"key"), Some(&42));
+        cache.del(&"key");
+        assert_eq!(cache.get(&"key"), None);
     }
 }
