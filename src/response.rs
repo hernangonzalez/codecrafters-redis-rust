@@ -7,6 +7,7 @@ pub trait Builder {
     fn text(inner: &str) -> Self;
     fn error(msg: &str) -> Self;
     fn ok() -> Self;
+    fn null() -> Self;
 }
 
 const CRLF: &str = "\r\n";
@@ -26,6 +27,10 @@ impl Builder for Response {
 
     fn ok() -> Self {
         Self::text("OK")
+    }
+
+    fn null() -> Self {
+        Response("$-1\r\n".to_string())
     }
 }
 
