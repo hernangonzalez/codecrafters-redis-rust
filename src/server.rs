@@ -3,6 +3,7 @@ use crate::response::{Builder, Response};
 use crate::scanner;
 use anyhow::Result;
 use bytes::BytesMut;
+use std::time;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -29,13 +30,14 @@ impl Server {
                 return Ok(());
             }
 
+            let now = time::Instant::now();
             let frame = std::str::from_utf8(&buffer)?;
             let commands = scanner::scan(frame);
             println!("Received #{} commands", commands.len());
 
             let responses = commands
                 .iter()
-                .filter_map(|c| self.redis.handle(c))
+                .filter_map(|c| self.redis.handle(c, now))
                 .collect::<Vec<_>>();
 
             if responses.is_empty() {

@@ -18,12 +18,15 @@ impl Redis {
         }
     }
 
-    pub fn handle(&self, cmd: &Command) -> Option<Response> {
+    pub fn handle(&self, cmd: &Command, received_at: time::Instant) -> Option<Response> {
         match cmd {
             Command::Ping => Some(Response::pong()),
             Command::Echo(message) => Some(Response::text(message)),
             Command::Get(key) => Some(self.handle_get(key)),
-            Command::Set(key, value, delta) => Some(self.handle_set(key, value, delta)),
+            Command::Set(key, value, delta) => {
+                let timeout = delta.map(|d| received_at + d);
+                Some(self.handle_set(key, value, timeout))
+            }
             Command::Unknown(cmd, args) => {
                 println!("Skip unknown command: {cmd}, args: {args}");
                 None
@@ -42,12 +45,11 @@ impl Redis {
         }
     }
 
-    fn handle_set(&self, key: &String, value: &str, duration: &Option<time::Duration>) -> Response {
+    fn handle_set(&self, key: &String, value: &str, timeout: Option<time::Instant>) -> Response {
         let previous = {
             let mut cache = self.cache.lock().unwrap();
             cache.value(key).cloned()
         };
-        let timeout = duration.map(|d| time::Instant::now() + d);
         let mut cache = self.cache.lock().expect("unique access to cache");
 
         cache.put(key.to_string(), value.to_string(), timeout);
