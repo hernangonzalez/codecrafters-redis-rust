@@ -21,6 +21,7 @@ impl Server {
     pub async fn handle_connection(&self, stream: TcpStream) -> Result<()> {
         let mut stream = stream;
         let mut buffer = BytesMut::with_capacity(1024);
+        let now = time::Instant::now();
 
         loop {
             let read_size = stream.read_buf(&mut buffer).await?;
@@ -30,7 +31,6 @@ impl Server {
                 return Ok(());
             }
 
-            let now = time::Instant::now();
             let frame = std::str::from_utf8(&buffer)?;
             let commands = scanner::scan(frame);
             println!("Received #{} commands", commands.len());
