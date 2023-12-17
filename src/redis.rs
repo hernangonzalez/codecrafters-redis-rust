@@ -43,8 +43,8 @@ impl Redis {
     fn handle_config(&self, cmd: &ConfigCmd) -> Response {
         match cmd {
             ConfigCmd::Get(key) => match key {
-                ConfigKey::Dir => Response::text(self.config.dir.to_str().unwrap()),
-                ConfigKey::DbFilename => Response::text(&self.config.db_filename),
+                ConfigKey::Dir => Response::array(&["dir", &self.config.dir.to_str().unwrap()]),
+                ConfigKey::DbFilename => Response::array(&["dbfilename", &self.config.db_filename]),
             },
         }
     }

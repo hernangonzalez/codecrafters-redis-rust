@@ -9,6 +9,7 @@ pub trait Builder {
     fn error(msg: &str) -> Self;
     fn ok() -> Self;
     fn null() -> Self;
+    fn array(items: &[&str]) -> Self;
 }
 
 const CRLF: &str = "\r\n";
@@ -32,6 +33,14 @@ impl Builder for Response {
 
     fn null() -> Self {
         Response("$-1\r\n".to_string())
+    }
+
+    fn array(items: &[&str]) -> Self {
+        let mut msg = format!("*{}{CRLF}", items.len());
+        let msg = items
+            .iter()
+            .fold(msg, |acc, m| acc + &format!("+{m}{CRLF}"));
+        Response(msg)
     }
 }
 
