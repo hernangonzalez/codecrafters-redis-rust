@@ -1,4 +1,5 @@
 use super::Command;
+use crate::command::ConfigCmd;
 use anyhow::{Context, Result};
 use std::str::Lines;
 use std::time;
@@ -53,6 +54,11 @@ fn scan_command(lines: Lines) -> Result<Command> {
         "ECHO" => {
             let all: Vec<_> = args.collect();
             Command::Echo(all.join(""))
+        }
+        "CONFIG" => {
+            let all: Vec<_> = args.collect();
+            let cmd = ConfigCmd::try_from(all.as_slice())?;
+            Command::Config(cmd)
         }
         _ => {
             let all: Vec<_> = args.collect();

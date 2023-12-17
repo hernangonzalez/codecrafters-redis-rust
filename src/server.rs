@@ -1,21 +1,23 @@
-use crate::redis::Redis;
-use crate::response::{Builder, Response};
-use crate::scanner;
+use crate::{
+    redis::Redis,
+    response::{Builder, Response},
+    scanner,
+};
 use anyhow::Result;
 use bytes::BytesMut;
 use std::time;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 pub struct Server {
     redis: Redis,
 }
 
 impl Server {
-    pub fn new() -> Self {
-        Self {
-            redis: Redis::new(),
-        }
+    pub fn new(redis: Redis) -> Self {
+        Self { redis }
     }
 
     pub async fn handle_connection(&self, stream: TcpStream) -> Result<()> {
