@@ -32,7 +32,7 @@ impl TryFrom<&[&str]> for ConfigCmd {
         let cmd = iter.next().context("command")?;
         let param = iter.next().context("param")?;
         match *cmd {
-            "GET" => Ok(Self::Get(ConfigKey::try_from(*param)?)),
+            "GET" | "get" => Ok(Self::Get(ConfigKey::try_from(*param)?)),
             u => Err(anyhow::anyhow!("Unknown cmd: {u}")),
         }
     }
