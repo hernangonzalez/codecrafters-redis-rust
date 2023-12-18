@@ -7,6 +7,14 @@ pub struct Config {
     pub db_filename: String,
 }
 
+impl Config {
+    pub fn local_store_path(&self) -> PathBuf {
+        let mut path = self.dir.clone();
+        path.push(self.db_filename.clone());
+        path
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {

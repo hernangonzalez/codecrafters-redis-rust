@@ -1,11 +1,13 @@
 mod cache;
 
-use crate::command::{ConfigCmd, ConfigKey};
+use crate::db::Database;
 use crate::{
-    command::Command,
+    command::{Command, ConfigCmd, ConfigKey},
     config::Config,
+    db::LocalStore,
     response::{Builder, Response},
 };
+use anyhow::Result;
 use std::{sync::Mutex, time};
 
 type Cache = cache::Cache<String, String>;
@@ -13,14 +15,14 @@ type Cache = cache::Cache<String, String>;
 pub struct Redis {
     cache: Mutex<Cache>,
     config: Config,
+    db: LocalStore,
 }
 
 impl Redis {
-    pub fn new(config: Config) -> Self {
-        Self {
-            cache: Mutex::new(Cache::new()),
-            config,
-        }
+    pub fn new(config: Config) -> Result<Self> {
+        let cache = Mutex::new(Cache::new());
+        let db = LocalStore::open_at(&config.local_store_path())?;
+        Ok(Self { cache, config, db })
     }
 
     pub fn handle(&self, cmd: &Command, received_at: time::Instant) -> Option<Response> {
@@ -33,11 +35,19 @@ impl Redis {
                 Some(self.handle_set(key, value, timeout))
             }
             Command::Config(cmd) => Some(self.handle_config(cmd)),
+            Command::Keys(op) => Some(self.handle_keys(op)),
             Command::Unknown(cmd, args) => {
                 println!("Skip unknown command: {cmd}, args: {args}");
                 None
             }
         }
+    }
+
+    fn handle_keys(&self, _op: &str) -> Response {
+        let keys = self.db.all_keys();
+        let keys: Vec<_> = keys.iter().map(String::as_str).collect();
+        let resp = Response::array(&keys);
+        resp
     }
 
     fn handle_config(&self, cmd: &ConfigCmd) -> Response {

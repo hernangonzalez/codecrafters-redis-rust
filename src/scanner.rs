@@ -60,6 +60,10 @@ fn scan_command(lines: Lines) -> Result<Command> {
             let cmd = ConfigCmd::try_from(all.as_slice())?;
             Command::Config(cmd)
         }
+        "KEYS" => {
+            let op = args.next().context("set key")?.to_string();
+            Command::Keys(op)
+        }
         _ => {
             let all: Vec<_> = args.collect();
             Command::Unknown(command, all.join(" "))

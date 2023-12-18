@@ -1,5 +1,7 @@
+mod codec;
 mod command;
 mod config;
+mod db;
 mod redis;
 mod response;
 mod scanner;
@@ -21,7 +23,7 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     let listener = TcpListener::bind("127.0.0.1:6379").await?;
     let config = Config::from(args.as_slice());
-    let redis = Redis::new(config);
+    let redis = Redis::new(config)?;
     let server = Arc::new(Server::new(redis));
     println!("Listening at 6379...");
 

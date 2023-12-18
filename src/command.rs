@@ -45,5 +45,6 @@ pub enum Command {
     Get(String),
     Set(String, String, Option<time::Duration>),
     Config(ConfigCmd),
+    Keys(String),
     Unknown(String, String),
 }

@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use crate::codec::encode;
 
 #[derive(PartialEq, Debug)]
 pub struct Response(String);
@@ -12,42 +12,40 @@ pub trait Builder {
     fn array(items: &[&str]) -> Self;
 }
 
-const CRLF: &str = "\r\n";
-
-impl Builder for Response {
-    fn pong() -> Self {
-        Self::text("PONG")
-    }
-
-    fn text(inner: &str) -> Self {
-        Response(format!("+{inner}{CRLF}"))
-    }
-
-    fn error(msg: &str) -> Self {
-        Response(format!("-Error {msg}{CRLF}"))
-    }
-
-    fn ok() -> Self {
-        Self::text("OK")
-    }
-
-    fn null() -> Self {
-        Response("$-1\r\n".to_string())
-    }
-
-    fn array(items: &[&str]) -> Self {
-        let mut msg = format!("*{}{CRLF}", items.len());
-        let msg = items
-            .iter()
-            .fold(msg, |acc, m| acc + &format!("+{m}{CRLF}"));
-        Response(msg)
+impl From<String> for Response {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 
-impl Deref for Response {
-    type Target = String;
+impl<'a> Into<&'a [u8]> for &'a Response {
+    fn into(self) -> &'a [u8] {
+        self.0.as_bytes()
+    }
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl Builder for Response {
+    fn pong() -> Self {
+        encode::text("PONG").into()
+    }
+
+    fn text(inner: &str) -> Self {
+        encode::text(inner).into()
+    }
+
+    fn error(msg: &str) -> Self {
+        encode::error(msg).into()
+    }
+
+    fn ok() -> Self {
+        encode::text("OK").into()
+    }
+
+    fn null() -> Self {
+        encode::null().into()
+    }
+
+    fn array(items: &[&str]) -> Self {
+        encode::array(items).into()
     }
 }

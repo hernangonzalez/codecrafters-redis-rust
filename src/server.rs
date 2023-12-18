@@ -50,7 +50,7 @@ impl Server {
 }
 
 async fn flush(stream: &mut TcpStream, response: &Response) -> Result<()> {
-    stream.write_all(response.as_bytes()).await?;
+    stream.write_all(response.into()).await?;
     Ok(())
 }
 
