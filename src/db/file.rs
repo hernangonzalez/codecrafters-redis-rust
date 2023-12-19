@@ -1,7 +1,7 @@
 use crate::db::codec;
 use anyhow::{Context, Result};
 use bytes::BytesMut;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader};
 use std::{
     fs::{self, File},
     io::{Read, Write},
@@ -10,16 +10,6 @@ use std::{
 
 const REDIS_RDB: &[u8] = b"REDIS";
 const REDIS_VER: &str = "0011";
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum Section {
-    Head,
-    Version(u8),
-    Aux(Aux),
-    Database(usize),
-    Resize(usize, usize),
-}
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -57,6 +47,9 @@ pub enum AuxKey {
     UsedMem,
 }
 
+#[derive(Debug)]
+pub struct Aux(String, String);
+
 impl Aux {
     fn read(reader: &mut impl Read) -> Result<Aux> {
         let key = codec::string::read(reader)?;
@@ -65,8 +58,32 @@ impl Aux {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
-pub struct Aux(String, String);
+pub enum Section {
+    Head,
+    Version(u8),
+    Aux(Aux),
+    Database(usize),
+    Resize(usize, usize),
+}
+
+impl Section {
+    fn from(code: OpCode, reader: &mut impl Read) -> Result<Self> {
+        match code {
+            OpCode::Aux => Aux::read(reader).map(Section::Aux),
+            OpCode::SelectDB => codec::length::read(reader)
+                .map(|len| len.into())
+                .map(Section::Database),
+            OpCode::ResizeDB => {
+                let db_size = codec::length::read(reader)?;
+                let exp_size = codec::length::read(reader)?;
+                Ok(Section::Resize(db_size.into(), exp_size.into()))
+            }
+            other => Err(anyhow::anyhow!("To be implemented: {other:?}")),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct RedisFile(File, u32);
@@ -119,30 +136,17 @@ impl Iterator for RedisFileReader {
 
     fn next(&mut self) -> Option<Self::Item> {
         let reader = &mut self.0;
-        let mut buf = [0; 1];
-        reader.read_exact(&mut buf).ok()?;
-        let Ok(op_code) = OpCode::try_from(buf[0]) else {
-            return None;
-        };
 
-        match op_code {
-            OpCode::Aux => {
-                let aux = Aux::read(reader).ok()?;
-                Some(Section::Aux(aux))
-            }
-            OpCode::SelectDB => {
-                let len = codec::length::read(reader).ok()?;
-                Some(Section::Database(len.into()))
-            }
-            OpCode::ResizeDB => {
-                let db_size = codec::length::read(reader).ok()?;
-                let exp_size = codec::length::read(reader).ok()?;
-                Some(Section::Resize(db_size.into(), exp_size.into()))
-            }
-            other => {
-                println!("To be implemented: {other:?}");
-                None
-            }
+        let buf = reader.fill_buf().ok()?;
+        if buf.is_empty() {
+            return None;
+        }
+
+        if let Ok(op_code) = OpCode::try_from(buf[0]) {
+            reader.consume(1);
+            Section::from(op_code, reader).ok()
+        } else {
+            None
         }
     }
 }
