@@ -77,9 +77,12 @@ impl Section {
             return Err(anyhow::anyhow!("Buffer is empty: EOF?"));
         }
 
-        let Ok(code) = OpCode::try_from(buf[0]) else {
+        // TODO: Use a `let...else` once Codecrafters updates this toolchain :'(.
+        let code = OpCode::try_from(buf[0]);
+        if code.is_err() {
             return Self::key_value(0, reader);
-        };
+        }
+        let code = code.unwrap();
 
         reader.consume(1);
         match code {
