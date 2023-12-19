@@ -14,10 +14,11 @@
 //     QuickList = 14,
 // }
 
+use anyhow::Result;
 use bytes::BytesMut;
 use std::io::Read;
 
-pub mod string {
+pub mod length {
     use super::*;
 
     const LENGTH_BITMASK: u8 = 0b11000000u8;
@@ -28,21 +29,67 @@ pub mod string {
 
     #[allow(dead_code)]
     #[derive(Debug)]
-    enum StringMask {
-        String(usize),
-        Int(u8),
+    pub enum Length {
+        Read(usize),
+        Value(u8),
         Compressed,
     }
 
-    pub fn read(reader: &mut impl Read) -> anyhow::Result<String> {
-        let kind = encoded_string_mask(reader)?;
+    impl Into<usize> for Length {
+        fn into(self) -> usize {
+            match self {
+                Self::Read(s) => s,
+                Self::Value(v) => v as usize,
+                Length::Compressed => panic!("to be implemented"),
+            }
+        }
+    }
+
+    pub fn read(reader: &mut impl Read) -> Result<Length> {
+        let mut buf = [0; 1];
+        reader.read_exact(&mut buf)?;
+        read_mask(buf[0], reader)
+    }
+
+    fn read_mask(mask: u8, reader: &mut impl Read) -> Result<Length> {
+        let mask = match mask & LENGTH_BITMASK {
+            LENGTH_READY => Length::Read(mask as usize),
+            LENGTH_READ_MORE => {
+                let mut buf2 = [0; 1];
+                reader.read_exact(&mut buf2)?;
+                let val: usize = ((mask & !LENGTH_BITMASK) as usize) << 8;
+                let val = val | (buf2[0] as usize);
+                Length::Read(val)
+            }
+            LENGTH_NEXT_4 => {
+                let mut buf2 = [0; 4];
+                reader.read_exact(&mut buf2)?;
+                let val = u32::from_ne_bytes(buf2) as usize;
+                Length::Read(val)
+            }
+            LENGTH_FORMAT => {
+                let len = mask & !LENGTH_BITMASK;
+                Length::Value(len)
+            }
+            _ => panic!("Unreachable"),
+        };
+        Ok(mask)
+    }
+}
+
+pub mod string {
+    use super::length::Length;
+    use super::*;
+
+    pub fn read(reader: &mut impl Read) -> Result<String> {
+        let kind = length::read(reader)?;
         let str = match kind {
-            StringMask::String(len) => {
+            Length::Read(len) => {
                 let mut buf = BytesMut::zeroed(len);
                 reader.read_exact(&mut buf)?;
                 std::str::from_utf8(&buf)?.to_string()
             }
-            StringMask::Int(len) => {
+            Length::Value(len) => {
                 let val: u32 = match len {
                     0 => {
                         let mut buf: [u8; 1] = [0; 1];
@@ -63,39 +110,8 @@ pub mod string {
                 };
                 val.to_string()
             }
-            StringMask::Compressed => panic!("Not implemented"),
+            Length::Compressed => panic!("Not implemented"),
         };
         Ok(str)
-    }
-
-    fn encoded_string_mask(reader: &mut impl Read) -> anyhow::Result<StringMask> {
-        let mut buf = [0; 1];
-        reader.read_exact(&mut buf)?;
-        read_string_mask(buf[0], reader)
-    }
-
-    fn read_string_mask(mask: u8, reader: &mut impl Read) -> anyhow::Result<StringMask> {
-        let mask = match mask & LENGTH_BITMASK {
-            LENGTH_READY => StringMask::String(mask as usize),
-            LENGTH_READ_MORE => {
-                let mut buf2 = [0; 1];
-                reader.read_exact(&mut buf2)?;
-                let val: usize = ((mask & !LENGTH_BITMASK) as usize) << 8;
-                let val = val | (buf2[0] as usize);
-                StringMask::String(val)
-            }
-            LENGTH_NEXT_4 => {
-                let mut buf2 = [0; 4];
-                reader.read_exact(&mut buf2)?;
-                let val = u32::from_ne_bytes(buf2) as usize;
-                StringMask::String(val)
-            }
-            LENGTH_FORMAT => {
-                let len = mask & !LENGTH_BITMASK;
-                StringMask::Int(len)
-            }
-            _ => panic!("Unreachable"),
-        };
-        Ok(mask)
     }
 }

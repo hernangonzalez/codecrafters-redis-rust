@@ -17,6 +17,8 @@ pub enum Section {
     Head,
     Version(u8),
     Aux(Aux),
+    Database(usize),
+    Resize(usize, usize),
 }
 
 #[allow(dead_code)]
@@ -119,14 +121,23 @@ impl Iterator for RedisFileReader {
         let reader = &mut self.0;
         let mut buf = [0; 1];
         reader.read_exact(&mut buf).ok()?;
-        let Ok(op_code) = crate::db::file::OpCode::try_from(buf[0]) else {
+        let Ok(op_code) = OpCode::try_from(buf[0]) else {
             return None;
         };
 
         match op_code {
-            crate::db::file::OpCode::Aux => {
+            OpCode::Aux => {
                 let aux = Aux::read(reader).ok()?;
                 Some(Section::Aux(aux))
+            }
+            OpCode::SelectDB => {
+                let len = codec::length::read(reader).ok()?;
+                Some(Section::Database(len.into()))
+            }
+            OpCode::ResizeDB => {
+                let db_size = codec::length::read(reader).ok()?;
+                let exp_size = codec::length::read(reader).ok()?;
+                Some(Section::Resize(db_size.into(), exp_size.into()))
             }
             other => {
                 println!("To be implemented: {other:?}");
