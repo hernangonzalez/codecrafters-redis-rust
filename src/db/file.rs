@@ -1,5 +1,4 @@
-use crate::db::codec;
-use crate::db::codec::length;
+use crate::db::codec::{self, length, Kind, Value};
 use anyhow::{Context, Result};
 use bytes::BytesMut;
 use std::io::{BufRead, BufReader};
@@ -67,7 +66,7 @@ pub enum Section {
     Aux(Aux),
     Database(usize),
     Resize(usize, usize),
-    Entry(String),
+    Entry(usize, String, Value),
 }
 
 impl Section {
@@ -107,14 +106,17 @@ impl Section {
         }
     }
 
-    fn key_value(_ts: usize, reader: &mut impl BufRead) -> Result<Self> {
-        use codec::Kind;
-
+    fn key_value(ts: usize, reader: &mut impl BufRead) -> Result<Self> {
         let mut kind = [0u8; 1];
         reader.read(&mut kind)?;
-        let _ = Kind::try_from(kind[0])?;
+        let kind = Kind::try_from(kind[0])?;
         let key = codec::string::read(reader)?;
-        Ok(Self::Entry(key))
+        let val = match kind {
+            Kind::String => codec::string::read(reader).map(Value::String),
+            k => Err(anyhow::anyhow!("Kind not supported: {k:?}")),
+        };
+
+        val.map(|v| Section::Entry(ts, key, v))
     }
 }
 

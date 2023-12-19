@@ -26,7 +26,7 @@ impl Redis {
         match cmd {
             Command::Ping => Some(Response::pong()),
             Command::Echo(message) => Some(Response::text(message)),
-            Command::Get(key) => Some(self.handle_get(key)),
+            Command::Get(key) => self.handle_get(key),
             Command::Set(key, value, delta) => {
                 let timeout = delta.map(|d| received_at + d);
                 Some(self.handle_set(key, value, timeout))
@@ -56,15 +56,18 @@ impl Redis {
         }
     }
 
-    fn handle_get(&self, k: &String) -> Response {
+    fn handle_get(&self, k: &String) -> Option<Response> {
         let mut cache = self.cache.lock().expect("unique access to cache");
-        match cache.value(k) {
-            Ok(value) => Response::text(value),
-            e => {
-                println!("Cache value error: {e:?}");
-                Response::null()
-            }
+        if let Ok(cached) = cache.value(k) {
+            return Some(Response::text(cached));
         }
+
+        let db = db::open_at(&self.config.local_store_path()).ok()?;
+        if let Some(val) = db.find(k) {
+            return Some(Response::text(&val));
+        }
+
+        None
     }
 
     fn handle_set(&self, key: &String, value: &str, timeout: Option<time::Instant>) -> Response {

@@ -40,6 +40,11 @@ impl TryFrom<u8> for Kind {
     }
 }
 
+#[derive(Debug)]
+pub enum Value {
+    String(String),
+}
+
 pub mod length {
     use super::*;
 
