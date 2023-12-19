@@ -1,22 +1,44 @@
-// #[allow(dead_code)]
-// #[repr(u8)]
-// pub enum Kind {
-//     String = 0,
-//     List = 1,
-//     Set = 2,
-//     SortedSet = 3,
-//     Hash = 4,
-//     ZipMap = 9,
-//     ZipList = 10,
-//     IntSet = 11,
-//     SortedSetZipList = 12,
-//     HashMapZipList = 13,
-//     QuickList = 14,
-// }
-
 use anyhow::Result;
 use bytes::BytesMut;
 use std::io::Read;
+
+#[allow(dead_code)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
+#[repr(u8)]
+pub enum Kind {
+    String = 0,
+    List = 1,
+    Set = 2,
+    SortedSet = 3,
+    Hash = 4,
+    ZipMap = 9,
+    ZipList = 10,
+    IntSet = 11,
+    SortedSetZipList = 12,
+    HashMapZipList = 13,
+    QuickList = 14,
+}
+
+impl TryFrom<u8> for Kind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(Self::String),
+            1 => Ok(Self::List),
+            2 => Ok(Self::Set),
+            3 => Ok(Self::SortedSet),
+            4 => Ok(Self::Hash),
+            9 => Ok(Self::ZipMap),
+            10 => Ok(Self::ZipList),
+            11 => Ok(Self::IntSet),
+            12 => Ok(Self::SortedSetZipList),
+            13 => Ok(Self::HashMapZipList),
+            14 => Ok(Self::QuickList),
+            e => Err(anyhow::anyhow!("Unknown kind: {e}")),
+        }
+    }
+}
 
 pub mod length {
     use super::*;

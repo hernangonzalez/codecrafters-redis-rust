@@ -1,4 +1,5 @@
 use crate::db::codec;
+use crate::db::codec::length;
 use anyhow::{Context, Result};
 use bytes::BytesMut;
 use std::io::{BufRead, BufReader};
@@ -66,10 +67,21 @@ pub enum Section {
     Aux(Aux),
     Database(usize),
     Resize(usize, usize),
+    Entry(String),
 }
 
 impl Section {
-    fn from(code: OpCode, reader: &mut impl Read) -> Result<Self> {
+    fn read(reader: &mut impl BufRead) -> Result<Self> {
+        let buf = reader.fill_buf()?;
+        if buf.is_empty() {
+            return Err(anyhow::anyhow!("Buffer is empty: EOF?"));
+        }
+
+        let Ok(code) = OpCode::try_from(buf[0]) else {
+            return Self::key_value(0, reader);
+        };
+
+        reader.consume(1);
         match code {
             OpCode::Aux => Aux::read(reader).map(Section::Aux),
             OpCode::SelectDB => codec::length::read(reader)
@@ -80,8 +92,26 @@ impl Section {
                 let exp_size = codec::length::read(reader)?;
                 Ok(Section::Resize(db_size.into(), exp_size.into()))
             }
-            other => Err(anyhow::anyhow!("To be implemented: {other:?}")),
+            OpCode::ExpireTimeMs => {
+                let exp: usize = length::read(reader)?.into();
+                Self::key_value(exp, reader)
+            }
+            OpCode::ExpireTime => {
+                let exp: usize = length::read(reader)?.into();
+                Self::key_value(exp * 1000, reader)
+            }
+            other => Err(anyhow::anyhow!("Code not supported: {other:?}")),
         }
+    }
+
+    fn key_value(_ts: usize, reader: &mut impl BufRead) -> Result<Self> {
+        use codec::Kind;
+
+        let mut kind = [0u8; 1];
+        reader.read(&mut kind)?;
+        let _ = Kind::try_from(kind[0])?;
+        let key = codec::string::read(reader)?;
+        Ok(Self::Entry(key))
     }
 }
 
@@ -136,17 +166,6 @@ impl Iterator for RedisFileReader {
 
     fn next(&mut self) -> Option<Self::Item> {
         let reader = &mut self.0;
-
-        let buf = reader.fill_buf().ok()?;
-        if buf.is_empty() {
-            return None;
-        }
-
-        if let Ok(op_code) = OpCode::try_from(buf[0]) {
-            reader.consume(1);
-            Section::from(op_code, reader).ok()
-        } else {
-            None
-        }
+        Section::read(reader).ok()
     }
 }
