@@ -67,7 +67,7 @@ impl Redis {
             return Some(Response::text(&val));
         }
 
-        None
+        Some(Response::null())
     }
 
     fn handle_set(&self, key: &String, value: &str, timeout: Option<time::Instant>) -> Response {
