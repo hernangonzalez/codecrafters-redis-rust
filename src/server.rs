@@ -35,28 +35,16 @@ impl Server {
             let frame = std::str::from_utf8(&buffer)?;
             let commands = scanner::scan(frame);
 
-            let responses = commands
-                .iter()
-                .filter_map(|c| self.redis.handle(c, now))
-                .collect::<Vec<_>>();
+            if commands.is_empty() {
+                let resp = &Response::error("No supported command found");
+                stream.write_all(resp.into()).await?;
+                continue;
+            }
 
-            if responses.is_empty() {
-                flush(&mut stream, &Response::error("No supported command found")).await?;
-            } else {
-                flush_all(&mut stream, &responses).await?;
+            let responses = commands.iter().filter_map(|c| self.redis.handle(c, now));
+            for response in responses {
+                stream.write_all((&response).into()).await?;
             }
         }
     }
-}
-
-async fn flush(stream: &mut TcpStream, response: &Response) -> Result<()> {
-    stream.write_all(response.into()).await?;
-    Ok(())
-}
-
-async fn flush_all(stream: &mut TcpStream, all: &[Response]) -> Result<()> {
-    for response in all {
-        flush(stream, response).await?;
-    }
-    Ok(())
 }

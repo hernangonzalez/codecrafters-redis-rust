@@ -1,7 +1,7 @@
-mod codec;
 mod command;
 mod config;
 mod db;
+mod proto;
 mod redis;
 mod response;
 mod scanner;

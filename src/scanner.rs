@@ -1,39 +1,19 @@
-use super::Command;
-use crate::command::ConfigCmd;
+use crate::{command::ConfigCmd, proto::decode, Command};
 use anyhow::{Context, Result};
-use std::str::Lines;
 use std::time;
 
-// For Simple Strings, the first byte of the reply is "+"
-// For Errors, the first byte of the reply is "-"
-// For Integers, the first byte of the reply is ":"
-// For Bulk Strings, the first byte of the reply is "$"
-// For Arrays, the first byte of the reply is "*"
-
-pub fn scan(buffer: &str) -> Box<[Command]> {
+pub fn scan(buffer: &str) -> Vec<Command> {
     let mut cmds = Vec::new();
-    let chunks = buffer.split('*').filter(|i| !i.is_empty());
-    for chunk in chunks {
-        let lines = chunk.lines();
-        match scan_command(lines) {
-            Ok(c) => cmds.push(c),
-            Err(e) => println!("{e}"),
-        }
+    let mut chunks = decode::array(buffer);
+    while let Ok(cmd) = scan_command(&mut chunks) {
+        cmds.push(cmd);
     }
-    cmds.into_boxed_slice()
+    cmds
 }
 
-fn scan_command(lines: Lines) -> Result<Command> {
-    let mut lines = lines;
-
-    let arg_count = lines.next().context("arg count")?.parse::<usize>()?;
-    assert_ne!(arg_count, 0);
-
-    let line_head = lines.next().context("command head")?;
-    assert!(line_head.starts_with('$'));
-
-    let command = lines.next().context("command")?.to_uppercase();
-    let mut args = lines.filter(|s| !s.starts_with('$'));
+fn scan_command<'a>(parts: &mut impl Iterator<Item = &'a str>) -> Result<Command> {
+    let command = parts.next().context("command")?.to_uppercase();
+    let mut args = parts.filter(|s| !s.starts_with('$'));
 
     let command = match command.as_str() {
         "PING" => Command::Ping,
@@ -61,7 +41,8 @@ fn scan_command(lines: Lines) -> Result<Command> {
             Command::Config(cmd)
         }
         "KEYS" => {
-            let op = args.next().context("set key")?.to_string();
+            let all: Vec<_> = args.collect();
+            let op = all.first().context("op")?.to_string();
             Command::Keys(op)
         }
         _ => {

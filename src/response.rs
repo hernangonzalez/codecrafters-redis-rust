@@ -1,4 +1,4 @@
-use crate::codec::encode;
+use crate::proto::encode;
 
 #[derive(PartialEq, Debug)]
 pub struct Response(String);
