@@ -6,6 +6,7 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     path::Path,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 const REDIS_RDB: &[u8] = b"REDIS";
@@ -58,6 +59,28 @@ impl Aux {
     }
 }
 
+#[derive(Debug)]
+pub struct Entry(Option<Duration>, String, Value);
+
+impl Entry {
+    pub fn is_expired(&self) -> bool {
+        if let Some(ts) = self.0 {
+            let date = UNIX_EPOCH.checked_add(ts);
+            date.map(|d| d < SystemTime::now()).unwrap_or(true)
+        } else {
+            false
+        }
+    }
+
+    pub fn key(&self) -> &String {
+        &self.1
+    }
+
+    pub fn val(&self) -> &Value {
+        &self.2
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Section {
@@ -66,7 +89,7 @@ pub enum Section {
     Aux(Aux),
     Database(usize),
     Resize(usize, usize),
-    Entry(usize, String, Value),
+    Entry(Entry),
 }
 
 impl Section {
@@ -79,34 +102,34 @@ impl Section {
         // TODO: Use a `let...else` once Codecrafters updates this toolchain :'(.
         let code = OpCode::try_from(buf[0]);
         if code.is_err() {
-            return Self::key_value(0, reader);
+            return Self::key_value(None, reader);
         }
         let code = code.unwrap();
 
         reader.consume(1);
         match code {
             OpCode::Aux => Aux::read(reader).map(Section::Aux),
-            OpCode::SelectDB => codec::length::read(reader)
+            OpCode::SelectDB => length::read(reader)
                 .map(|len| len.into())
                 .map(Section::Database),
             OpCode::ResizeDB => {
-                let db_size = codec::length::read(reader)?;
-                let exp_size = codec::length::read(reader)?;
+                let db_size = length::read(reader)?;
+                let exp_size = length::read(reader)?;
                 Ok(Section::Resize(db_size.into(), exp_size.into()))
             }
             OpCode::ExpireTimeMs => {
-                let exp: usize = length::read(reader)?.into();
-                Self::key_value(exp, reader)
+                let exp = codec::time::read_ms(reader)?;
+                Self::key_value(Some(exp), reader)
             }
             OpCode::ExpireTime => {
-                let exp: usize = length::read(reader)?.into();
-                Self::key_value(exp * 1000, reader)
+                let exp = codec::time::read_sec(reader)?;
+                Self::key_value(Some(exp), reader)
             }
             other => Err(anyhow::anyhow!("Code not supported: {other:?}")),
         }
     }
 
-    fn key_value(ts: usize, reader: &mut impl BufRead) -> Result<Self> {
+    fn key_value(ts: Option<Duration>, reader: &mut impl BufRead) -> Result<Self> {
         let mut kind = [0u8; 1];
         reader.read(&mut kind)?;
         let kind = Kind::try_from(kind[0])?;
@@ -116,7 +139,7 @@ impl Section {
             k => Err(anyhow::anyhow!("Kind not supported: {k:?}")),
         };
 
-        val.map(|v| Section::Entry(ts, key, v))
+        val.map(|v| Entry(ts, key, v)).map(Section::Entry)
     }
 }
 

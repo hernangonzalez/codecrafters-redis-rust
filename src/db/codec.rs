@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bytes::BytesMut;
-use std::io::Read;
+use std::{io::Read, time::Duration};
 
 #[allow(dead_code)]
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
@@ -40,7 +40,7 @@ impl TryFrom<u8> for Kind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     String(String),
 }
@@ -91,7 +91,7 @@ pub mod length {
             LENGTH_NEXT_4 => {
                 let mut buf2 = [0; 4];
                 reader.read_exact(&mut buf2)?;
-                let val = u32::from_ne_bytes(buf2) as usize;
+                let val = u32::from_le_bytes(buf2) as usize;
                 Length::Read(val)
             }
             LENGTH_FORMAT => {
@@ -121,17 +121,17 @@ pub mod string {
                     0 => {
                         let mut buf: [u8; 1] = [0; 1];
                         reader.read_exact(&mut buf)?;
-                        u8::from_ne_bytes(buf) as u32
+                        u8::from_le_bytes(buf) as u32
                     }
                     1 => {
                         let mut buf: [u8; 2] = [0; 2];
                         reader.read_exact(&mut buf)?;
-                        u16::from_ne_bytes(buf) as u32
+                        u16::from_le_bytes(buf) as u32
                     }
                     2 => {
                         let mut buf: [u8; 4] = [0; 4];
                         reader.read_exact(&mut buf)?;
-                        u32::from_ne_bytes(buf) as u32
+                        u32::from_le_bytes(buf)
                     }
                     _ => panic!("Unsupported"),
                 };
@@ -140,5 +140,23 @@ pub mod string {
             Length::Compressed => panic!("Not implemented"),
         };
         Ok(str)
+    }
+}
+
+pub mod time {
+    use super::*;
+
+    pub fn read_ms(reader: &mut impl Read) -> Result<Duration> {
+        let mut buf = [0u8; 8];
+        reader.read_exact(&mut buf)?;
+        let ts = u64::from_le_bytes(buf);
+        Ok(Duration::from_millis(ts))
+    }
+
+    pub fn read_sec(reader: &mut impl Read) -> Result<Duration> {
+        let mut buf = [0u8; 4];
+        reader.read_exact(&mut buf)?;
+        let ts = u32::from_le_bytes(buf);
+        Ok(Duration::from_secs(ts as u64))
     }
 }

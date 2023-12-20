@@ -18,10 +18,18 @@ pub fn open_at(path: &Path) -> Result<impl Database> {
 
 impl RedisFile {
     fn all_entries(self) -> impl Iterator<Item = (String, Value)> {
-        self.into_iter().flat_map(|s| match s {
-            Section::Entry(_, k, v) => Some((k, v)),
-            _ => None,
-        })
+        self.into_iter()
+            .flat_map(|s| match s {
+                Section::Entry(e) => Some(e),
+                _ => None,
+            })
+            .filter_map(|e| {
+                if e.is_expired() {
+                    None
+                } else {
+                    Some((e.key().clone(), e.val().clone()))
+                }
+            })
     }
 }
 
